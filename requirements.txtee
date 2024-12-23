@@ -1,0 +1,7 @@
+Flask==3.1.0
+flask-cors==5.0.0
+langchain-openai==0.2.12  
+langchain-core==0.3.25  
+langgraph==0.2.59 
+langchain-community==0.3.12
+langchain-huggingface==0.1.2
