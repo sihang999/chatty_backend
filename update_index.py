@@ -1,56 +1,74 @@
 import os
 import json
-from langchain_community.document_loaders import UnstructuredMarkdownLoader
-from langchain_text_splitters.markdown import MarkdownTextSplitter
-from uuid import uuid4
-from langchain_huggingface import HuggingFaceEmbeddings
 import faiss
 from langchain_community.vectorstores import FAISS
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
+from langchain_text_splitters.markdown import MarkdownTextSplitter
+# from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.docstore.in_memory import InMemoryDocstore
+from uuid import uuid4
+import sentence_model
 
-
-folder_path = "./data/markdown_files"
+data_folder_path = "markdown_files"
 status_file = "file_status.json"
 vector_store_path = "faiss_index"
 
+
+def ensure_files_and_folders_exist(data_folder_path= "markdown_files", status_file="file_status.json"):
+    """
+    Ensure the specified folder and files exist. If not, create them.
+
+    Parameters:
+        data_folder_path (str): Path to the data folder.
+        status_file (str): Path to the status file.
+    """
+    # Ensure the data folder exists
+    if not os.path.exists(data_folder_path):
+        os.makedirs(data_folder_path)
+        print(f"Folder '{data_folder_path}' created.")
+    else:
+        print(f"Folder '{data_folder_path}' already exists.")
+
+
+    # Ensure the status file exists
+    if not os.path.exists(status_file):
+        with open(status_file, 'w') as file:
+            json.dump({}, file)  # Initialize with an empty JSON object
+        print(f"File '{status_file}' created.")
+    else:
+        print(f"File '{status_file}' already exists.")
+
+
 #  Just get the existed vector_store
-def get_verctor_store():
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/multi-qa-mpnet-base-dot-v1")
-    index = faiss.IndexFlatL2(len(embeddings.embed_query("hello world")))
+def get_verctor_store(vector_store_path = "faiss_index"):
+    # 创建一个嵌入模型实例，用于将文本转换为向量（数值表示）。
+    # embeddings = HuggingFaceEmbeddings(model_name="./multi-qa-mpnet-base-dot-v1")
+    index = faiss.IndexFlatL2(len(sentence_model.EMBEDDINGS_MODELv1.embed_query("hello world")))
+    # 初始化vector store
     vector_store = FAISS(
-            embedding_function=embeddings,
+            embedding_function=sentence_model.EMBEDDINGS_MODELv1,
             index=index,
             docstore=InMemoryDocstore(),
             index_to_docstore_id={},
         )
-    vector_store = FAISS.load_local(
-                vector_store_path, embeddings, allow_dangerous_deserialization=True
-            )
-    return vector_store
-
-vector_store = get_verctor_store()
-
-
-# update the files and delete the expired files
-def manage_files(folder_path, status_file, vector_store):
-
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/multi-qa-mpnet-base-dot-v1")
-    text_splitter = MarkdownTextSplitter(chunk_size=1000, chunk_overlap=200)
-    index = faiss.IndexFlatL2(len(embeddings.embed_query("hello world")))
-    vector_store = FAISS(
-        embedding_function=embeddings,
-        index=index,
-        docstore=InMemoryDocstore(),
-        index_to_docstore_id={},
-    )
-
+    #  加载已有的向量存储
     if os.path.exists(vector_store_path):
         vector_store = FAISS.load_local(
-            "faiss_index", embeddings, allow_dangerous_deserialization=True
+            "faiss_index", sentence_model.EMBEDDINGS_MODELv1, allow_dangerous_deserialization=True
         )
+    return vector_store
+
+
+
+# update the new files index and delete the no existed files index
+
+def manage_files(data_folder_path = "markdown_files", status_file = "file_status.json", vector_store_path = "faiss_index"):
+
+    text_splitter = MarkdownTextSplitter(chunk_size=1000, chunk_overlap=200)
+    vector_store = get_verctor_store()
 
     # read the file last change time and uuid 
-    if os.path.exists(status_file):
+    if os.path.exists(status_file) and os.path.getsize(status_file) > 0:
         with open(status_file, "r") as f:
             file_status = json.load(f)
     else:
@@ -58,19 +76,20 @@ def manage_files(folder_path, status_file, vector_store):
 
     # copy the file status for new status
     new_file_status = file_status.copy()
-    # default there is no change
+    # default there is no change in markdown_files
     change=False
 
     # get the current files names list
-    current_files = set(os.listdir(folder_path))
+    current_files = set(os.listdir(data_folder_path))
 
-    # check if there is any changed files or new files
-    for file_name in os.listdir(folder_path):
+    # check if there is any changed files or new files, only handle md files
+    for file_name in os.listdir(data_folder_path):
         if file_name.endswith(".md"):
-            file_path = os.path.join(folder_path, file_name)
+            file_path = os.path.join(data_folder_path, file_name)
             file_mtime = os.path.getmtime(file_path)  
             file_id = file_name  
 
+            # 根据创建时间检查文件是否更新，根据文件名称检查文件是否被新创建
             if file_id not in file_status or file_status[file_id]["mtime"] != file_mtime:
                 print(f"Processing changed or new file: {file_name}")
 
@@ -79,7 +98,7 @@ def manage_files(folder_path, status_file, vector_store):
                 docs = loader.load()
                 split_docs = text_splitter.split_documents(docs)
 
-                # delete the old vector
+                # delete the old vector of new file
                 if file_id in file_status:
                     print(f"Deleting old vectors for {file_name}")
                     old_uuids = file_status[file_id]["uuids"]
@@ -99,8 +118,6 @@ def manage_files(folder_path, status_file, vector_store):
 
             else:
                 print(f"No changes detected for {file_name}")
-
-
     # check there is any old file deleted
     for file_id in list(file_status.keys()):
 
@@ -116,8 +133,6 @@ def manage_files(folder_path, status_file, vector_store):
             del new_file_status[file_id]
             print(f"Deleted record for {file_id} in file_status")
             change = True
-
-
     if change:
         # store the new vector_store
         vector_store.save_local(vector_store_path)
@@ -125,11 +140,14 @@ def manage_files(folder_path, status_file, vector_store):
         # store the new status_files
         with open(status_file, "w") as f:
             json.dump(new_file_status, f)
-
         print("Update complete!")
 
-# test above function
+
+
+
+# # # test above function
 # if __name__ == "__main__":
+#     ensure_files_and_folders_exist()
 #     print("Starting manage_files...")
-#     manage_files(folder_path, status_file, vector_store_path)
+#     manage_files()
 
