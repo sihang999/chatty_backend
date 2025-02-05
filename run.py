@@ -7,9 +7,9 @@ from flask import Flask
 from flask_cors import CORS
 import sentence_model
 
-# get the enviroment variables
-from dotenv import load_dotenv
-load_dotenv()
+# # # get the enviroment variables
+# from dotenv import load_dotenv
+# load_dotenv()
 
 # EMBEDDINGS_MODELv1 = None
 
@@ -36,6 +36,6 @@ if __name__ == '__main__':
     flask_thread = threading.Thread(target=update_files_task)
     flask_thread.start()
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
     # app.run(host="0.0.0.0", port=5000, ssl_context=("cert.pem", "key.pem"))
 

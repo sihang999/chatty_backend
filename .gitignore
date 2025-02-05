@@ -1,0 +1,6 @@
+# 忽略整个文件夹
+__pycache__/
+multi-qa-mpnet-base-dot-v1/
+
+# 忽略 .env 文件（用于存储环境变量）
+.env
