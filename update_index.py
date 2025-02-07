@@ -145,9 +145,10 @@ def manage_files(data_folder_path = "markdown_files", status_file = "file_status
 
 
 
-# # # test above function
-# if __name__ == "__main__":
-#     ensure_files_and_folders_exist()
-#     print("Starting manage_files...")
-#     manage_files()
+# # test above function
+if __name__ == "__main__":
+    ensure_files_and_folders_exist()
+    sentence_model.get_model()
+    print("Starting manage_files...")
+    manage_files()
 

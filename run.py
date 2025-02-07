@@ -18,6 +18,7 @@ def update_files_task():
         now = datetime.now()
         if now.hour == 2:  
             ensure_files_and_folders_exist()
+            sentence_model.get_model()
             manage_files()
         sleep(2700)  
 
